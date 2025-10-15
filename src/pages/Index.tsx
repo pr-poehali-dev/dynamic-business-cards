@@ -6,19 +6,57 @@ import Icon from '@/components/ui/icon';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 
 const Index = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: isLogin ? 'Добро пожаловать!' : 'Регистрация успешна!',
-      description: isLogin ? 'Вы успешно вошли в систему' : 'Аккаунт создан, добро пожаловать!',
-    });
-    navigate('/dashboard');
+    setLoading(true);
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const name = formData.get('name') as string;
+    
+    try {
+      let result;
+      if (isLogin) {
+        result = await api.login(email, password);
+      } else {
+        result = await api.register(email, password, name);
+      }
+      
+      if (result.success) {
+        localStorage.setItem('userId', result.user.id);
+        localStorage.setItem('userName', result.user.name);
+        localStorage.setItem('userRole', result.user.role);
+        
+        toast({
+          title: isLogin ? 'Добро пожаловать!' : 'Регистрация успешна!',
+          description: isLogin ? 'Вы успешно вошли в систему' : 'Аккаунт создан, добро пожаловать!',
+        });
+        navigate('/dashboard');
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: result.error || 'Что-то пошло не так',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось подключиться к серверу',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const features = [
@@ -128,20 +166,20 @@ const Index = () => {
                 {!isLogin && (
                   <div className="space-y-2">
                     <Label htmlFor="name">Имя</Label>
-                    <Input id="name" placeholder="Введите ваше имя" required />
+                    <Input id="name" name="name" placeholder="Введите ваше имя" required />
                   </div>
                 )}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="your@email.com" required />
+                  <Input id="email" name="email" type="email" placeholder="your@email.com" required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Пароль</Label>
-                  <Input id="password" type="password" placeholder="••••••••" required />
+                  <Input id="password" name="password" type="password" placeholder="••••••••" required />
                 </div>
 
-                <Button type="submit" className="w-full bg-gradient-to-r from-primary to-secondary text-white">
-                  {isLogin ? 'Войти' : 'Зарегистрироваться'}
+                <Button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-primary to-secondary text-white">
+                  {loading ? 'Загрузка...' : isLogin ? 'Войти' : 'Зарегистрироваться'}
                 </Button>
 
                 <div className="text-center text-sm">

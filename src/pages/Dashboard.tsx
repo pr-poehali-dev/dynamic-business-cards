@@ -5,32 +5,50 @@ import Icon from '@/components/ui/icon';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-
-const viewsData = [
-  { day: 'Пн', views: 145 },
-  { day: 'Вт', views: 200 },
-  { day: 'Ср', views: 180 },
-  { day: 'Чт', views: 260 },
-  { day: 'Пт', views: 310 },
-  { day: 'Сб', views: 220 },
-  { day: 'Вс', views: 190 },
-];
-
-const earningsData = [
-  { month: 'Янв', amount: 2200 },
-  { month: 'Фев', amount: 3100 },
-  { month: 'Мар', amount: 2800 },
-  { month: 'Апр', amount: 3900 },
-  { month: 'Май', amount: 4200 },
-  { month: 'Июн', amount: 3700 },
-];
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
-  const stats = [
-    { label: 'Просмотры', value: '135,000', icon: 'Eye', trend: '+12%', color: 'text-primary' },
-    { label: 'Заработано', value: '₽32,000', icon: 'Wallet', trend: '+8%', color: 'text-secondary' },
-    { label: 'Рекламы', value: '13', icon: 'FileText', trend: '+3', color: 'text-accent' },
-    { label: 'Переходы', value: '2,840', icon: 'MousePointer', trend: '+15%', color: 'text-primary' },
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const userId = localStorage.getItem('userId') || '2';
+  const userName = localStorage.getItem('userName') || 'Пользователь';
+  
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const data = await api.getStats(userId);
+        setStats(data);
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadStats();
+  }, [userId]);
+  
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Загрузка...</div>;
+  }
+  
+  const viewsData = stats?.dailyStats?.slice(0, 7).reverse().map((d: any, i: number) => ({
+    day: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][i] || d.date,
+    views: d.views
+  })) || [];
+  
+  const earningsData = stats?.dailyStats?.slice(0, 6).map((d: any) => ({
+    month: d.date,
+    amount: d.earnings
+  })) || [];
+  
+  const dashboardStats = [
+    { label: 'Просмотры', value: stats?.dailyStats?.reduce((acc: number, d: any) => acc + d.views, 0).toLocaleString() || '0', icon: 'Eye', trend: '+12%', color: 'text-primary' },
+    { label: 'Заработано', value: `₽${Math.round(stats?.balance || 0).toLocaleString()}`, icon: 'Wallet', trend: '+8%', color: 'text-secondary' },
+    { label: 'Рекламы', value: String(stats?.adsCount?.total || 0), icon: 'FileText', trend: `+${stats?.adsCount?.active || 0}`, color: 'text-accent' },
+    { label: 'Переходы', value: stats?.dailyStats?.reduce((acc: number, d: any) => acc + d.clicks, 0).toLocaleString() || '0', icon: 'MousePointer', trend: '+15%', color: 'text-primary' },
   ];
 
   return (
@@ -60,7 +78,7 @@ const Dashboard = () => {
       <div className="container mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold mb-2">Добро пожаловать, Пользователь!</h2>
+            <h2 className="text-3xl font-bold mb-2">Добро пожаловать, {userName}!</h2>
             <p className="text-muted-foreground">Статистика вашего аккаунта за последние 7 дней</p>
           </div>
           <Button className="bg-gradient-to-r from-primary to-secondary text-white">
@@ -70,7 +88,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {dashboardStats.map((stat, index) => (
             <Card key={index} className="border-none shadow-lg bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:scale-105">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -123,16 +141,12 @@ const Dashboard = () => {
               <CardTitle className="text-xl">Активные рекламы</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { name: 'Баннер 728×90', views: 45200, limit: 50000, type: 'banner' },
-                { name: 'Текст «Акция»', views: 12300, limit: 15000, type: 'text' },
-                { name: 'Баннер 300×250', views: 28900, limit: 30000, type: 'banner' },
-              ].map((ad, index) => (
+              {(stats?.recentAds || []).map((ad: any, index: number) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Icon name={ad.type === 'banner' ? 'Image' : 'FileText'} size={16} className="text-muted-foreground" />
-                      <span className="text-sm font-medium">{ad.name}</span>
+                      <span className="text-sm font-medium">{ad.title}</span>
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {ad.views.toLocaleString()} / {ad.limit.toLocaleString()}

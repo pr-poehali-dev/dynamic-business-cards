@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {
+      "name": "Get user statistics",
+      "method": "GET",
+      "queryParams": {
+        "user_id": "2"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "balance": "number",
+        "totalEarnings": "number",
+        "dailyStats": "array"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
